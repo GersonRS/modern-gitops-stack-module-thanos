@@ -17,7 +17,7 @@ resource "argocd_project" "this" {
 
   spec {
     description  = "Thanos application project for cluster ${var.destination_cluster}"
-    source_repos = ["https://github.com/camptocamp/devops-stack-module-thanos.git"]
+    source_repos = ["https://github.com/GersonRS/modern-gitops-stack-module-thanos.git"]
 
     destination {
       name      = var.destination_cluster
@@ -66,7 +66,7 @@ resource "argocd_application" "this" {
     project = var.argocd_project == null ? argocd_project.this[0].metadata.0.name : var.argocd_project
 
     source {
-      repo_url        = "https://github.com/camptocamp/devops-stack-module-thanos.git"
+      repo_url        = "https://github.com/GersonRS/modern-gitops-stack-module-thanos.git"
       path            = "charts/thanos"
       target_revision = var.target_revision
       helm {
