@@ -320,7 +320,7 @@ spec:
         severity: warning
   {{- end }}
 
-    # FIXME As it stands right now, our DevOps Stack global architecture assumes that Thanos is configured to work in sidecar mode. This means that this group of rules is always needed until the moment we start using Thanos in receiver mode.
+    # FIXME As it stands right now, our Modern Gitops Stack global architecture assumes that Thanos is configured to work in sidecar mode. This means that this group of rules is always needed until the moment we start using Thanos in receiver mode.
   - name: thanos-sidecar
     rules:
     - alert: ThanosSidecarBucketOperationsFailed
@@ -602,7 +602,7 @@ spec:
         severity: critical
     {{- end }}
     
-    # FIXME As it stands right now, our DevOps Stack global architecture assumes that Thanos is configured to work in sidecar mode. This means that this rule is always needed until the moment we start using Thanos in receiver mode.
+    # FIXME As it stands right now, our Modern Gitops Stack global architecture assumes that Thanos is configured to work in sidecar mode. This means that this rule is always needed until the moment we start using Thanos in receiver mode.
     - alert: ThanosSidecarIsDown
       annotations:
         description: {{"Thanos Sidecar has disappeared. Prometheus target for the component cannot be discovered."}}

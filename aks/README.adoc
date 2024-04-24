@@ -1,0 +1,753 @@
+= AKS variant
+
+This folder contains the variant to use when deploying in Microsoft Azure using an AKS cluster.
+
+== Usage
+
+This module can be declared by adding the following block on your Terraform configuration:
+
+[source,terraform]
+----
+module "thanos" {
+  source = "git::https://github.com/GersonRS/modern-gitops-stack-module-thanos.git//aks?ref=<RELEASE>"
+
+  cluster_name     = TODO
+  base_domain      = TODO
+  cluster_issuer   = local.cluster_issuer
+  argocd_namespace = module.argocd_bootstrap.argocd_namespace
+
+  metrics_storage = {
+    container           = azurerm_storage_container.thanos.name
+    storage_account     = azurerm_storage_account.thanos.name
+    storage_account_key = azurerm_storage_account.thanos.primary_access_key
+  }
+
+  thanos = {
+    oidc = module.oidc.oidc
+  }
+
+  dependency_ids = {
+    argocd       = module.argocd_bootstrap.id
+    traefik      = module.traefik.id
+    cert-manager = module.cert-manager.id
+  }
+}
+----
+
+As you can see, a minimum requirement for this module is an Azure Blob Storage bucket and an OIDC provider (more information below).
+
+IMPORTANT: You are in charge of creating an Azure Blob Storage for Thanos to store the archived metrics. We've decided to keep the creation of this bucket outside of this module, mainly because the persistence of the data should not be related to the instantiation of the module itself.
+
+TIP: Check the xref:ROOT:ROOT:tutorials/deploy_aks.adoc[AKS deployment example] to see how to create the storage and to better understand the values passed on the example above.
+
+NOTE: Do not forget that the bucket configuration also needs to be passed to the module `kube-prometheus-stack`.
+
+Although the declaration above allows you to have a barebones Thanos deployed, it is highly recommended that you customize a few settings for a production-ready deployment. You need to at least configure the resource requirements for a few of the Thanos' components and the size of the persistent volume used by the compactor. You can also configure the compactor retention times, as in the example below.
+
+[source,terraform]
+----
+module "thanos" {
+  source = "git::https://github.com/GersonRS/modern-gitops-stack-module-thanos.git//aks?ref=<RELEASE>"
+
+  cluster_name     = TODO
+  base_domain      = TODO
+  cluster_issuer   = local.cluster_issuer
+  argocd_namespace = module.argocd_bootstrap.argocd_namespace
+
+  metrics_storage = {
+    container           = azurerm_storage_container.thanos.name
+    storage_account     = azurerm_storage_account.thanos.name
+    storage_account_key = azurerm_storage_account.thanos.primary_access_key
+  }
+
+  thanos = {
+    # OIDC configuration
+    oidc = module.oidc.oidc
+
+    # Configuration of the persistent volume for the compactor
+    compactor_persistent_size = "100Gi"
+
+    # Resources configuration for the pods
+    compactor_resources = {
+      limits = {
+        memory = "1Gi"
+      }
+      requests = {
+        cpu    = "0.5"
+        memory = "512Mi"
+      }
+    }
+    storegateway_resources = {
+      limits = {
+        memory = "1Gi"
+      }
+      requests = {
+        cpu    = "0.5"
+        memory = "1Gi"
+      }
+    }
+    query_resources = {
+      limits = {
+        memory = "1Gi"
+      }
+      requests = {
+        cpu    = "0.5"
+        memory = "512Mi"
+      }
+    }
+
+    # Retention settings for the compactor
+    compactor_retention = {
+      raw      = "60d"
+      five_min = "120d"
+      one_hour = "240d"
+    }
+  }
+
+  depends_on = [module.argocd_bootstrap]
+}
+----
+
+As you can see on the examples above, the variable `thanos` provides an interface to customize the most frequently used settings. This variable is merged with the local value `thanos_defaults`, which contains some sensible defaults to have a barebones working deployment. You can check the default values on the link:./local.tf[`local.tf`] file.
+
+If there is a need to configure something besides the common settings that we have provided above, you can customize the chart's `values.yaml` by adding an Helm configuration as an HCL structure:
+
+[source,terraform]
+----
+module "thanos" {
+  source = "git::https://github.com/GersonRS/modern-gitops-stack-module-thanos.git//aks?ref=<RELEASE>"
+
+  cluster_name     = TODO
+  base_domain      = TODO
+  cluster_issuer   = local.cluster_issuer
+  argocd_namespace = module.argocd_bootstrap.argocd_namespace
+
+  metrics_storage = {
+    container           = azurerm_storage_container.thanos.name
+    storage_account     = azurerm_storage_account.thanos.name
+    storage_account_key = azurerm_storage_account.thanos.primary_access_key
+  }
+
+  thanos = {
+    oidc = module.oidc.oidc
+  }
+
+  helm_values = [{ # Note the curly brackets here
+    thanos = {
+      map = {
+        string = "string"
+        bool   = true
+      }
+      sequence = [
+        {
+          key1 = "value1"
+          key2 = "value2"
+        },
+        {
+          key1 = "value1"
+          key2 = "value2"
+        },
+      ]
+      sequence2 = [
+        "string1",
+        "string2"
+      ]
+    }
+  }]
+
+  depends_on = [module.argocd_bootstrap]
+}
+----
+
+=== OIDC
+
+NOTE: This module was developed with OIDC in mind.
+
+There is an OIDC proxy container deployed as a sidecar on each pod that has a web interface. Consequently, the `thanos` variable is expected to have a map `oidc` containing at least the Issuer URL, the Client ID, and the Client Secret.
+
+You can pass these values by pointing an output from another module (as above), or by defining them explicitly:
+
+[source,terraform]
+----
+module "thanos" {
+  ...
+  thanos = {
+    oidc = {
+      issuer_url    = "<URL>"
+      client_id     = "<ID>"
+      client_secret = "<SECRET>"
+    }
+  }
+  ...
+}
+----
+
+=== Resource Configuration
+
+Since the resource requirements are not the same on every deployment and because the consumed resources also influence the cost associated, we refrained from configuring default resource requirements for the components of Thanos. We did, however, set memory limits for some of the pods (`query`, `storegateway` and `compactor` all have a 1 GB memory limit). We recommend that you customize these values as you see fit.
+
+IMPORTANT: At the very least you should configure the size for the _PersistentVolume_ used by the compactor.
+
+This value MUST be configured otherwise the compactor will NOT work on a production deployment. The Thanos documentation https://thanos.io/tip/thanos/quick-tutorial.md/#compactor|[recommends] a size of 100-300 GB.
+
+== Technical Reference
+
+=== Dependencies
+
+==== `module.argocd_bootstrap.id`
+
+Obviously, the module depends on an already running Argo CD in the cluster in order for the application to be created.
+
+==== `module.traefik.id` and `module.cert-manager.id`
+
+This module has multiple ingresses and consequently it must be deployed after the module `traefik` and `cert-manager`.
+
+// BEGIN_TF_DOCS
+=== Requirements
+
+The following requirements are needed by this module:
+
+- [[requirement_argocd]] <<requirement_argocd,argocd>> (>= 5)
+
+- [[requirement_null]] <<requirement_null,null>> (>= 3)
+
+- [[requirement_random]] <<requirement_random,random>> (>= 3)
+
+- [[requirement_utils]] <<requirement_utils,utils>> (>= 1)
+
+=== Providers
+
+The following providers are used by this module:
+
+- [[provider_null]] <<provider_null,null>> (>= 3)
+
+- [[provider_azurerm]] <<provider_azurerm,azurerm>>
+
+=== Modules
+
+The following Modules are called:
+
+==== [[module_thanos]] <<module_thanos,thanos>>
+
+Source: ../
+
+Version:
+
+=== Resources
+
+The following resources are used by this module:
+
+- https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/federated_identity_credential[azurerm_federated_identity_credential.thanos] (resource)
+- https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment[azurerm_role_assignment.storage_contributor] (resource)
+- https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/user_assigned_identity[azurerm_user_assigned_identity.thanos] (resource)
+- https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource[null_resource.dependencies] (resource)
+- https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/resource_group[azurerm_resource_group.node_resource_group] (data source)
+- https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/storage_container[azurerm_storage_container.container] (data source)
+
+=== Required Inputs
+
+The following input variables are required:
+
+==== [[input_metrics_storage]] <<input_metrics_storage,metrics_storage>>
+
+Description: Azure Blob Storage configuration for metric archival.
+
+Type:
+[source,hcl]
+----
+object({
+    container                        = string
+    storage_account                  = string
+    managed_identity_node_rg_name    = optional(string, null)
+    managed_identity_oidc_issuer_url = optional(string, null)
+    storage_account_key              = optional(string, null)
+  })
+----
+
+==== [[input_cluster_name]] <<input_cluster_name,cluster_name>>
+
+Description: Name given to the cluster. Value used for the ingress' URL of the application.
+
+Type: `string`
+
+==== [[input_base_domain]] <<input_base_domain,base_domain>>
+
+Description: Base domain of the cluster. Value used for the ingress' URL of the application.
+
+Type: `string`
+
+=== Optional Inputs
+
+The following input variables are optional (have default values):
+
+==== [[input_subdomain]] <<input_subdomain,subdomain>>
+
+Description: Subdomain of the cluster. Value used for the ingress' URL of the application.
+
+Type: `string`
+
+Default: `"apps"`
+
+==== [[input_argocd_project]] <<input_argocd_project,argocd_project>>
+
+Description: Name of the Argo CD AppProject where the Application should be created. If not set, the Application will be created in a new AppProject only for this Application.
+
+Type: `string`
+
+Default: `null`
+
+==== [[input_argocd_labels]] <<input_argocd_labels,argocd_labels>>
+
+Description: Labels to attach to the Argo CD Application resource.
+
+Type: `map(string)`
+
+Default: `{}`
+
+==== [[input_destination_cluster]] <<input_destination_cluster,destination_cluster>>
+
+Description: Destination cluster where the application should be deployed.
+
+Type: `string`
+
+Default: `"in-cluster"`
+
+==== [[input_target_revision]] <<input_target_revision,target_revision>>
+
+Description: Override of target revision of the application chart.
+
+Type: `string`
+
+Default: `"v4.0.0"`
+
+==== [[input_cluster_issuer]] <<input_cluster_issuer,cluster_issuer>>
+
+Description: SSL certificate issuer to use. Usually you would configure this value as `letsencrypt-staging` or `letsencrypt-prod` on your root `*.tf` files.
+
+Type: `string`
+
+Default: `"selfsigned-issuer"`
+
+==== [[input_helm_values]] <<input_helm_values,helm_values>>
+
+Description: Helm chart value overrides. They should be passed as a list of HCL structures.
+
+Type: `any`
+
+Default: `[]`
+
+==== [[input_deep_merge_append_list]] <<input_deep_merge_append_list,deep_merge_append_list>>
+
+Description: A boolean flag to enable/disable appending lists instead of overwriting them.
+
+Type: `bool`
+
+Default: `false`
+
+==== [[input_app_autosync]] <<input_app_autosync,app_autosync>>
+
+Description: Automated sync options for the Argo CD Application resource.
+
+Type:
+[source,hcl]
+----
+object({
+    allow_empty = optional(bool)
+    prune       = optional(bool)
+    self_heal   = optional(bool)
+  })
+----
+
+Default:
+[source,json]
+----
+{
+  "allow_empty": false,
+  "prune": true,
+  "self_heal": true
+}
+----
+
+==== [[input_dependency_ids]] <<input_dependency_ids,dependency_ids>>
+
+Description: IDs of the other modules on which this module depends on.
+
+Type: `map(string)`
+
+Default: `{}`
+
+==== [[input_thanos]] <<input_thanos,thanos>>
+
+Description: Most frequently used Thanos settings. This variable is merged with the local value `thanos_defaults`, which contains some sensible defaults. You can check the default values on the link:./local.tf[`local.tf`] file. If there still is anything other that needs to be customized, you can always pass on configuration values using the variable `helm_values`.
+
+Type: `any`
+
+Default: `{}`
+
+==== [[input_resources]] <<input_resources,resources>>
+
+Description: Resource limits and requests for Thanos' components. Follow the style on https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/[official documentation] to understand the format of the values.
+
+IMPORTANT: These are not production values. You should always adjust them to your needs.
+
+Type:
+[source,hcl]
+----
+object({
+
+    query = optional(object({
+      requests = optional(object({
+        cpu    = optional(string, "250m")
+        memory = optional(string, "512Mi")
+      }), {})
+      limits = optional(object({
+        cpu    = optional(string)
+        memory = optional(string, "512Mi")
+      }), {})
+    }), {})
+
+    query_frontend = optional(object({
+      requests = optional(object({
+        cpu    = optional(string, "250m")
+        memory = optional(string, "256Mi")
+      }), {})
+      limits = optional(object({
+        cpu    = optional(string)
+        memory = optional(string, "512Mi")
+      }), {})
+    }), {})
+
+    bucketweb = optional(object({
+      requests = optional(object({
+        cpu    = optional(string, "50m")
+        memory = optional(string, "128Mi")
+      }), {})
+      limits = optional(object({
+        cpu    = optional(string)
+        memory = optional(string, "128Mi")
+      }), {})
+    }), {})
+
+    compactor = optional(object({
+      requests = optional(object({
+        cpu    = optional(string, "250m")
+        memory = optional(string, "256Mi")
+      }), {})
+      limits = optional(object({
+        cpu    = optional(string)
+        memory = optional(string, "512Mi")
+      }), {})
+    }), {})
+
+    storegateway = optional(object({
+      requests = optional(object({
+        cpu    = optional(string, "250m")
+        memory = optional(string, "512Mi")
+      }), {})
+      limits = optional(object({
+        cpu    = optional(string)
+        memory = optional(string, "512Mi")
+      }), {})
+    }), {})
+
+    redis = optional(object({
+      requests = optional(object({
+        cpu    = optional(string, "200m")
+        memory = optional(string, "256Mi")
+      }), {})
+      limits = optional(object({
+        cpu    = optional(string)
+        memory = optional(string, "512Mi")
+      }), {})
+    }), {})
+
+  })
+----
+
+Default: `{}`
+
+==== [[input_enable_service_monitor]] <<input_enable_service_monitor,enable_service_monitor>>
+
+Description: Boolean to enable the deployment of a service monitor for Prometheus. This also enables the deployment of default Prometheus rules and Grafana dashboards, which are embedded inside the chart templates and are taken from the official Thanos examples, available https://github.com/thanos-io/thanos/blob/main/examples/alerts/alerts.yaml[here].
+
+Type: `bool`
+
+Default: `false`
+
+=== Outputs
+
+The following outputs are exported:
+
+==== [[output_id]] <<output_id,id>>
+
+Description: ID to pass other modules in order to refer to this module as a dependency. It takes the ID that comes from the main module and passes it along to the code that called this variant in the first place.
+// END_TF_DOCS
+
+=== Reference in table format 
+
+.Show tables
+[%collapsible]
+====
+// BEGIN_TF_TABLES
+= Requirements
+
+[cols="a,a",options="header,autowidth"]
+|===
+|Name |Version
+|[[requirement_argocd]] <<requirement_argocd,argocd>> |>= 5
+|[[requirement_null]] <<requirement_null,null>> |>= 3
+|[[requirement_random]] <<requirement_random,random>> |>= 3
+|[[requirement_utils]] <<requirement_utils,utils>> |>= 1
+|===
+
+= Providers
+
+[cols="a,a",options="header,autowidth"]
+|===
+|Name |Version
+|[[provider_null]] <<provider_null,null>> |>= 3
+|[[provider_azurerm]] <<provider_azurerm,azurerm>> |n/a
+|===
+
+= Modules
+
+[cols="a,a,a",options="header,autowidth"]
+|===
+|Name |Source |Version
+|[[module_thanos]] <<module_thanos,thanos>> |../ |
+|===
+
+= Resources
+
+[cols="a,a",options="header,autowidth"]
+|===
+|Name |Type
+|https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/federated_identity_credential[azurerm_federated_identity_credential.thanos] |resource
+|https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment[azurerm_role_assignment.storage_contributor] |resource
+|https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/user_assigned_identity[azurerm_user_assigned_identity.thanos] |resource
+|https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource[null_resource.dependencies] |resource
+|https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/resource_group[azurerm_resource_group.node_resource_group] |data source
+|https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/storage_container[azurerm_storage_container.container] |data source
+|===
+
+= Inputs
+
+[cols="a,a,a,a,a",options="header,autowidth"]
+|===
+|Name |Description |Type |Default |Required
+|[[input_metrics_storage]] <<input_metrics_storage,metrics_storage>>
+|Azure Blob Storage configuration for metric archival.
+|
+
+[source]
+----
+object({
+    container                        = string
+    storage_account                  = string
+    managed_identity_node_rg_name    = optional(string, null)
+    managed_identity_oidc_issuer_url = optional(string, null)
+    storage_account_key              = optional(string, null)
+  })
+----
+
+|n/a
+|yes
+
+|[[input_cluster_name]] <<input_cluster_name,cluster_name>>
+|Name given to the cluster. Value used for the ingress' URL of the application.
+|`string`
+|n/a
+|yes
+
+|[[input_base_domain]] <<input_base_domain,base_domain>>
+|Base domain of the cluster. Value used for the ingress' URL of the application.
+|`string`
+|n/a
+|yes
+
+|[[input_subdomain]] <<input_subdomain,subdomain>>
+|Subdomain of the cluster. Value used for the ingress' URL of the application.
+|`string`
+|`"apps"`
+|no
+
+|[[input_argocd_project]] <<input_argocd_project,argocd_project>>
+|Name of the Argo CD AppProject where the Application should be created. If not set, the Application will be created in a new AppProject only for this Application.
+|`string`
+|`null`
+|no
+
+|[[input_argocd_labels]] <<input_argocd_labels,argocd_labels>>
+|Labels to attach to the Argo CD Application resource.
+|`map(string)`
+|`{}`
+|no
+
+|[[input_destination_cluster]] <<input_destination_cluster,destination_cluster>>
+|Destination cluster where the application should be deployed.
+|`string`
+|`"in-cluster"`
+|no
+
+|[[input_target_revision]] <<input_target_revision,target_revision>>
+|Override of target revision of the application chart.
+|`string`
+|`"v4.0.0"`
+|no
+
+|[[input_cluster_issuer]] <<input_cluster_issuer,cluster_issuer>>
+|SSL certificate issuer to use. Usually you would configure this value as `letsencrypt-staging` or `letsencrypt-prod` on your root `*.tf` files.
+|`string`
+|`"selfsigned-issuer"`
+|no
+
+|[[input_helm_values]] <<input_helm_values,helm_values>>
+|Helm chart value overrides. They should be passed as a list of HCL structures.
+|`any`
+|`[]`
+|no
+
+|[[input_deep_merge_append_list]] <<input_deep_merge_append_list,deep_merge_append_list>>
+|A boolean flag to enable/disable appending lists instead of overwriting them.
+|`bool`
+|`false`
+|no
+
+|[[input_app_autosync]] <<input_app_autosync,app_autosync>>
+|Automated sync options for the Argo CD Application resource.
+|
+
+[source]
+----
+object({
+    allow_empty = optional(bool)
+    prune       = optional(bool)
+    self_heal   = optional(bool)
+  })
+----
+
+|
+
+[source]
+----
+{
+  "allow_empty": false,
+  "prune": true,
+  "self_heal": true
+}
+----
+
+|no
+
+|[[input_dependency_ids]] <<input_dependency_ids,dependency_ids>>
+|IDs of the other modules on which this module depends on.
+|`map(string)`
+|`{}`
+|no
+
+|[[input_thanos]] <<input_thanos,thanos>>
+|Most frequently used Thanos settings. This variable is merged with the local value `thanos_defaults`, which contains some sensible defaults. You can check the default values on the link:./local.tf[`local.tf`] file. If there still is anything other that needs to be customized, you can always pass on configuration values using the variable `helm_values`.
+|`any`
+|`{}`
+|no
+
+|[[input_resources]] <<input_resources,resources>>
+|Resource limits and requests for Thanos' components. Follow the style on https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/[official documentation] to understand the format of the values.
+
+IMPORTANT: These are not production values. You should always adjust them to your needs.
+
+|
+
+[source]
+----
+object({
+
+    query = optional(object({
+      requests = optional(object({
+        cpu    = optional(string, "250m")
+        memory = optional(string, "512Mi")
+      }), {})
+      limits = optional(object({
+        cpu    = optional(string)
+        memory = optional(string, "512Mi")
+      }), {})
+    }), {})
+
+    query_frontend = optional(object({
+      requests = optional(object({
+        cpu    = optional(string, "250m")
+        memory = optional(string, "256Mi")
+      }), {})
+      limits = optional(object({
+        cpu    = optional(string)
+        memory = optional(string, "512Mi")
+      }), {})
+    }), {})
+
+    bucketweb = optional(object({
+      requests = optional(object({
+        cpu    = optional(string, "50m")
+        memory = optional(string, "128Mi")
+      }), {})
+      limits = optional(object({
+        cpu    = optional(string)
+        memory = optional(string, "128Mi")
+      }), {})
+    }), {})
+
+    compactor = optional(object({
+      requests = optional(object({
+        cpu    = optional(string, "250m")
+        memory = optional(string, "256Mi")
+      }), {})
+      limits = optional(object({
+        cpu    = optional(string)
+        memory = optional(string, "512Mi")
+      }), {})
+    }), {})
+
+    storegateway = optional(object({
+      requests = optional(object({
+        cpu    = optional(string, "250m")
+        memory = optional(string, "512Mi")
+      }), {})
+      limits = optional(object({
+        cpu    = optional(string)
+        memory = optional(string, "512Mi")
+      }), {})
+    }), {})
+
+    redis = optional(object({
+      requests = optional(object({
+        cpu    = optional(string, "200m")
+        memory = optional(string, "256Mi")
+      }), {})
+      limits = optional(object({
+        cpu    = optional(string)
+        memory = optional(string, "512Mi")
+      }), {})
+    }), {})
+
+  })
+----
+
+|`{}`
+|no
+
+|[[input_enable_service_monitor]] <<input_enable_service_monitor,enable_service_monitor>>
+|Boolean to enable the deployment of a service monitor for Prometheus. This also enables the deployment of default Prometheus rules and Grafana dashboards, which are embedded inside the chart templates and are taken from the official Thanos examples, available https://github.com/thanos-io/thanos/blob/main/examples/alerts/alerts.yaml[here].
+|`bool`
+|`false`
+|no
+
+|===
+
+= Outputs
+
+[cols="a,a",options="header,autowidth"]
+|===
+|Name |Description
+|[[output_id]] <<output_id,id>> |ID to pass other modules in order to refer to this module as a dependency. It takes the ID that comes from the main module and passes it along to the code that called this variant in the first place.
+|===
+// END_TF_TABLES
+====
