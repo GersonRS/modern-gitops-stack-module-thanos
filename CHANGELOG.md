@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/GersonRS/modern-gitops-stack-module-thanos/compare/v1.0.0...v1.1.0) (2024-04-26)
+
+
+### Features
+
+* adjust documentation ([ce6e424](https://github.com/GersonRS/modern-gitops-stack-module-thanos/commit/ce6e424a89ef19f85e4c96616d548befbb8a151e))
+
 ## 1.0.0 (2024-04-24)
 
 
