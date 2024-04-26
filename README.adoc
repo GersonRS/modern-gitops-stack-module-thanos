@@ -13,7 +13,7 @@ The Thanos chart used by this module is shipped in this repository as well, in o
 |*{thanos-chart-version}* |{original-repo-url}[Chart] |https://artifacthub.io/packages/helm/bitnami/thanos/{thanos-chart-version}?modal=values[`values.yaml`]
 |===
 
-*Since this module is meant to be instantiated using its variants, the usage documentation is available in each variant* ( xref:./aks/README.adoc[AKS] | xref:./eks/README.adoc[EKS] | xref:./kind/README.adoc[KinD] | xref:./sks/README.adoc[SKS] ).
+*Since this module is meant to be instantiated using its variants, the usage documentation is available in each variant* ( xref:./aks/README.adoc[AKS] | xref:./eks/README.adoc[EKS] | xref:./kind/README.adoc[KinD] ).
 
 Below you will only find the technical reference automatically generated from the `*.tf` files on the root module. 
 
