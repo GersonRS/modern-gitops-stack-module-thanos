@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.0](https://github.com/GersonRS/modern-gitops-stack-module-thanos/compare/v2.5.0...v2.6.0) (2025-01-18)
+
+
+### 🚀 New Features
+
+* update project] ([0777934](https://github.com/GersonRS/modern-gitops-stack-module-thanos/commit/07779340242bd18b8bc526c79a61ed01202fe3e7))
+
 ## [2.5.0](https://github.com/GersonRS/modern-gitops-stack-module-thanos/compare/v2.4.0...v2.5.0) (2024-05-01)
 
 
