@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.1](https://github.com/GersonRS/modern-gitops-stack-module-thanos/compare/v2.6.0...v2.6.1) (2025-02-07)
+
+
+### 📚 Documentation
+
+* **terraform-docs:** generate docs and write to README.adoc ([9bf02e5](https://github.com/GersonRS/modern-gitops-stack-module-thanos/commit/9bf02e5d8731c0bef1300fd4cb9c35d750a7dcff))
+
 ## [2.6.0](https://github.com/GersonRS/modern-gitops-stack-module-thanos/compare/v2.5.0...v2.6.0) (2025-01-18)
 
 
