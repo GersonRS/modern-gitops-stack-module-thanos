@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.2](https://github.com/GersonRS/modern-gitops-stack-module-thanos/compare/v2.6.1...v2.6.2) (2025-02-08)
+
+
+### ⌨️ Code Refactoring
+
+* adjust workflows ([2a11a5f](https://github.com/GersonRS/modern-gitops-stack-module-thanos/commit/2a11a5fa0bb388f16734bc3911f04d8c466a7460))
+
 ## [2.6.1](https://github.com/GersonRS/modern-gitops-stack-module-thanos/compare/v2.6.0...v2.6.1) (2025-02-07)
 
 
