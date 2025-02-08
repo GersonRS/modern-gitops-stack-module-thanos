@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.6.1](https://github.com/GersonRS/modern-gitops-stack-module-thanos/compare/v2.6.0...v2.6.1) (2025-02-07)
+
+
+### 📚 Documentation
+
+* **terraform-docs:** generate docs and write to README.adoc ([9bf02e5](https://github.com/GersonRS/modern-gitops-stack-module-thanos/commit/9bf02e5d8731c0bef1300fd4cb9c35d750a7dcff))
+
+## [2.6.0](https://github.com/GersonRS/modern-gitops-stack-module-thanos/compare/v2.5.0...v2.6.0) (2025-01-18)
+
+
+### 🚀 New Features
+
+* update project] ([0777934](https://github.com/GersonRS/modern-gitops-stack-module-thanos/commit/07779340242bd18b8bc526c79a61ed01202fe3e7))
+
+## [2.5.0](https://github.com/GersonRS/modern-gitops-stack-module-thanos/compare/v2.4.0...v2.5.0) (2024-05-01)
+
+
+### 🚀 New Features
+
+* change chart update to include secrets ([4985e5c](https://github.com/GersonRS/modern-gitops-stack-module-thanos/commit/4985e5cf00ab4e5499838d2860c70c1411bec644))
+
+
+### 📚 Documentation
+
+* **terraform-docs:** generate docs and write to README.adoc ([d5c926a](https://github.com/GersonRS/modern-gitops-stack-module-thanos/commit/d5c926acfe1cf46099e713c857e7e72dec69f11b))
+
 ## [2.4.0](https://github.com/GersonRS/modern-gitops-stack-module-thanos/compare/v2.3.0...v2.4.0) (2024-05-01)
 
 
